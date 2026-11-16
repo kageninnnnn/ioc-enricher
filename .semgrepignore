@@ -1,0 +1,8 @@
+# Paths excluded from Semgrep SAST
+.git/
+.venv/
+venv/
+tests/
+docs/
+helm/
+**/__pycache__/

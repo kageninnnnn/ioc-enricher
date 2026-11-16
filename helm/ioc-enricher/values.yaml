@@ -1,0 +1,111 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/OWNER/ioc-enricher
+  # Defaults to .Chart.AppVersion when empty
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+#  - name: ghcr-pull
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Name of an existing Secret (e.g. created by a SealedSecret) holding ABUSEIPDB_API_KEY
+existingSecret: ""
+existingSecretKey: ABUSEIPDB_API_KEY
+
+env: []
+#  - name: LOG_LEVEL
+#    value: info
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8000"
+  prometheus.io/path: /metrics
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+containerPort: 8000
+
+ingress:
+  enabled: false
+  className: traefik
+  annotations: {}
+  hosts:
+    - host: ioc-enricher.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 3
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 75
+
+networkPolicy:
+  enabled: true
+  # Namespace label selector allowed to reach the pod (k3s traefik lives in kube-system)
+  ingressFromNamespaces:
+    - kube-system
+  # Allow egress HTTPS to the internet for enrichment APIs (AbuseIPDB etc.)
+  allowExternalEgress: true
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

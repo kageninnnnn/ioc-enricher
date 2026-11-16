@@ -1,0 +1,14 @@
+[
+  {"indicator": "185.220.101.1", "score": 90, "category": "tor-exit/bruteforce", "source": "demo-feed"},
+  {"indicator": "45.155.205.233", "score": 85, "category": "scanner", "source": "demo-feed"},
+  {"indicator": "203.0.113.50", "score": 40, "category": "spam", "source": "demo-feed"},
+  {"indicator": "8.8.8.8", "score": 0, "category": "public-dns", "source": "allowlist"},
+  {"indicator": "2001:db8::bad", "score": 80, "category": "c2", "source": "demo-feed"},
+  {"indicator": "evil-phish.example", "score": 95, "category": "phishing", "source": "demo-feed"},
+  {"indicator": "suspicious-cdn.example", "score": 50, "category": "newly-registered", "source": "demo-feed"},
+  {"indicator": "google.com", "score": 0, "category": "top-site", "source": "allowlist"},
+  {"indicator": "http://evil-phish.example/login", "score": 95, "category": "phishing", "source": "demo-feed"},
+  {"indicator": "44d88612fea8a8f36de82e1278abb02f", "score": 100, "category": "eicar-test", "source": "demo-feed"},
+  {"indicator": "3395856ce81f2b7382dee72602f798b642f14140", "score": 100, "category": "eicar-test", "source": "demo-feed"},
+  {"indicator": "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f", "score": 100, "category": "eicar-test", "source": "demo-feed"}
+]

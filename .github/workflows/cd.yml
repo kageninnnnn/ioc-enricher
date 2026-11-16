@@ -1,0 +1,63 @@
+name: cd
+
+# Deploys only after the "ci" workflow succeeded for a push to main
+# (i.e. all security gates passed and the image was pushed + signed).
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false  # never interrupt a running helm upgrade
+
+permissions: {}
+
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
+    # Self-hosted: the target cluster (homelab k3s/kind) is on a private network
+    # with no public API endpoint. A runner inside that network reaches the API
+    # server without exposing it to the internet; the kubeconfig never leaves it.
+    runs-on: self-hosted
+    environment:
+      name: production   # add required reviewers in repo settings for a manual gate
+    permissions:
+      contents: read
+      packages: read
+      id-token: write    # cosign verify of keyless signature
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: azure/setup-helm@v4
+      - uses: sigstore/cosign-installer@v3
+      - name: Verify image signature before deploying
+        run: |
+          IMAGE="ghcr.io/$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          cosign verify "$IMAGE:$SHA" \
+            --certificate-identity "${{ github.server_url }}/${{ github.repository }}/.github/workflows/ci.yml@refs/heads/main" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com > /dev/null
+      - name: Write kubeconfig
+        env:
+          KUBECONFIG_DATA: ${{ secrets.KUBECONFIG }}
+        run: |
+          umask 077
+          printf '%s' "$KUBECONFIG_DATA" > "$RUNNER_TEMP/kubeconfig"
+      - name: Helm upgrade
+        env:
+          KUBECONFIG: ${{ runner.temp }}/kubeconfig
+        run: |
+          helm upgrade --install ioc-enricher ./helm/ioc-enricher \
+            --namespace ioc-enricher --create-namespace \
+            --set image.repository="ghcr.io/${GITHUB_REPOSITORY,,}" \
+            --set image.tag="$SHA" \
+            --atomic --wait --timeout 5m
+      - name: Remove kubeconfig
+        if: always()
+        run: rm -f "$RUNNER_TEMP/kubeconfig"

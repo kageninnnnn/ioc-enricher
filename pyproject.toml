@@ -1,0 +1,24 @@
+[project]
+name = "ioc-enricher"
+version = "0.1.0"
+description = "IOC enrichment API"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["helm", ".github"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "C4", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --cov-report=term-missing --cov-fail-under=80"
+
+[tool.coverage.run]
+source = ["app"]
+branch = true

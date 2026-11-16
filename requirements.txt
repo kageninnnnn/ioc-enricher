@@ -1,0 +1,11 @@
+fastapi==0.163.1
+starlette==1.10.0
+uvicorn==0.54.0
+pydantic==2.14.3
+pydantic-settings==2.16.3
+httpx==0.28.1
+prometheus-fastapi-instrumentator==8.1.0
+prometheus-client==0.26.0
+h11==0.16.0
+certifi==2026.10.23
+idna==3.20

@@ -1,0 +1,13 @@
+ioc-enricher {{ .Values.image.tag | default .Chart.AppVersion }} deployed to namespace {{ .Release.Namespace }}.
+
+{{- if .Values.ingress.enabled }}
+URL: http{{ if .Values.ingress.tls }}s{{ end }}://{{ (index .Values.ingress.hosts 0).host }}/health
+{{- else }}
+Port-forward:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "ioc-enricher.fullname" . }} 8000:{{ .Values.service.port }}
+  curl http://127.0.0.1:8000/health
+{{- end }}
+
+{{- if not .Values.existingSecret }}
+NOTE: existingSecret is empty - ABUSEIPDB_API_KEY is not set; AbuseIPDB enrichment is disabled.
+{{- end }}

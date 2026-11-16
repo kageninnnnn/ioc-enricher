@@ -1,0 +1,16 @@
+# Gitleaks config: inherit all built-in rules, add project-specific allowlist.
+title = "ioc-enricher gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist"
+paths = [
+  '''docs/PIPELINE\.md''',
+  '''\.gitleaks\.toml''',
+]
+# Known public documentation placeholders (AWS docs example key)
+regexes = [
+  '''AKIAIOSFODNN7EXAMPLE''',
+]
