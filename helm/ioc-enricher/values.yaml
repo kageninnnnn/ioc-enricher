@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/OWNER/ioc-enricher
+  repository: ghcr.io/kageninnnnn/ioc-enricher
   # Defaults to .Chart.AppVersion when empty
   tag: ""
   pullPolicy: IfNotPresent
