@@ -16,7 +16,7 @@ def _check_status(data: dict, ok: str = "ok") -> bool:
     status = data.get("query_status")
     if status == ok:
         return True
-    if status in {"no_results", "hash_not_found", "illegal_search_term"}:
+    if status in {"no_results", "no_result", "hash_not_found", "illegal_search_term"}:
         return False
     raise SourceError(f"abuse.ch query_status={status!r}")
 

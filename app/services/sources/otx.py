@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 import httpx
 
 from app.config import Settings
@@ -31,7 +33,7 @@ class AlienVaultOTX(Source):
         self, value: str, ioc_type: IndicatorType, ctx: SourceContext
     ) -> SourceResult | None:
         s = ctx.settings
-        url = f"{s.otx_url}/{_SECTION[ioc_type]}/{value}/general"
+        url = f"{s.otx_url}/{_SECTION[ioc_type]}/{quote(value, safe='')}/general"
         resp = await ctx.http.get(url, headers={"X-OTX-API-KEY": s.otx_api_key.get_secret_value()})
         if resp.status_code == httpx.codes.NOT_FOUND:
             return None
