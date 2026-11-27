@@ -9,3 +9,4 @@ prometheus-client==0.26.0
 h11==0.16.0
 certifi==2026.10.23
 idna==3.20
+redis==7.4.1

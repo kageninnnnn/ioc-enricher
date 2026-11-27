@@ -33,16 +33,22 @@ kubeseal --controller-namespace kube-system --fetch-cert > pub-cert.pem
 ```bash
 kubectl create namespace ioc-enricher --dry-run=client -o yaml | kubectl apply -f -
 
-read -rs ABUSEIPDB_API_KEY   # avoids putting the key in shell history
-kubectl -n ioc-enricher create secret generic abuseipdb \
+# `read -rs` keeps the keys out of shell history; skip any provider you don't use
+read -rs ABUSEIPDB_API_KEY; read -rs VIRUSTOTAL_API_KEY; read -rs OTX_API_KEY
+read -rs ABUSECH_AUTH_KEY;  read -rs API_KEYS   # API_KEYS: comma-separated client keys
+kubectl -n ioc-enricher create secret generic ioc-enricher-keys \
   --from-literal=ABUSEIPDB_API_KEY="$ABUSEIPDB_API_KEY" \
+  --from-literal=VIRUSTOTAL_API_KEY="$VIRUSTOTAL_API_KEY" \
+  --from-literal=OTX_API_KEY="$OTX_API_KEY" \
+  --from-literal=ABUSECH_AUTH_KEY="$ABUSECH_AUTH_KEY" \
+  --from-literal=API_KEYS="$API_KEYS" \
   --dry-run=client -o yaml \
 | kubeseal --controller-namespace kube-system --format yaml \
-  > k8s/sealed-secrets/sealedsecret-abuseipdb.yaml
-unset ABUSEIPDB_API_KEY
+  > k8s/sealed-secrets/sealedsecret-ioc-enricher.yaml
+unset ABUSEIPDB_API_KEY VIRUSTOTAL_API_KEY OTX_API_KEY ABUSECH_AUTH_KEY API_KEYS
 
-kubectl apply -f k8s/sealed-secrets/sealedsecret-abuseipdb.yaml
-kubectl -n ioc-enricher get secret abuseipdb
+kubectl apply -f k8s/sealed-secrets/sealedsecret-ioc-enricher.yaml
+kubectl -n ioc-enricher get secret ioc-enricher-keys
 ```
 
 The result is bound to the namespace and name (default `strict` scope); renaming either
@@ -52,15 +58,17 @@ requires re-sealing.
 
 ```bash
 helm upgrade --install ioc-enricher helm/ioc-enricher -n ioc-enricher \
-  --set existingSecret=abuseipdb
+  --set existingSecret=ioc-enricher-keys
 ```
 
-The key is injected via `secretKeyRef` with `optional: true`, so the app still starts
-(with AbuseIPDB disabled) if the secret is missing.
+All keys are injected via `envFrom.secretRef` with `optional: true`, so the app still
+starts if the secret (or any single key) is missing; providers without a key are skipped.
+A v0.1 secret named `abuseipdb` holding only `ABUSEIPDB_API_KEY` keeps working:
+`--set existingSecret=abuseipdb`.
 
 ## Notes
 
-- `sealedsecret-abuseipdb.example.yaml` is a **placeholder** showing the shape only.
+- `sealedsecret-ioc-enricher.example.yaml` is a **placeholder** showing the shape only.
 - Never commit the plain `Secret` produced by `kubectl create secret --dry-run`.
 - Back up the controller key (`kubectl -n kube-system get secret -l sealedsecrets.bitnami.com/sealed-secrets-key -o yaml`)
   somewhere safe and offline; without it, sealed secrets cannot be decrypted after a cluster rebuild.

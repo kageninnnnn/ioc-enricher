@@ -22,7 +22,7 @@ jobs:
     # Self-hosted: the target cluster (homelab k3s/kind) is on a private network
     # with no public API endpoint. A runner inside that network reaches the API
     # server without exposing it to the internet; the kubeconfig never leaves it.
-    runs-on: self-hosted
+    runs-on: [self-hosted, k3s, deploy]
     environment:
       name: production   # add required reviewers in repo settings for a manual gate
     permissions:

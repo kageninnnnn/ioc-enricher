@@ -1,0 +1,6 @@
+# ZAP rule overrides: <plugin id>\t<IGNORE|WARN|FAIL>\t<reason>
+# JSON API, no browser rendering: anti-clickjacking / CSP headers are not applicable
+10020	IGNORE	(Missing Anti-clickjacking Header - JSON API, no HTML frames)
+10038	WARN	(CSP header not set - JSON API; /docs Swagger UI loads assets from CDN)
+# Swagger UI on /docs is loaded from jsdelivr
+10017	IGNORE	(Cross-Domain JavaScript Source File Inclusion - Swagger UI at /docs only)

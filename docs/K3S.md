@@ -35,7 +35,7 @@ helm upgrade --install ioc-enricher helm/ioc-enricher -n ioc-enricher \
   --set image.repository=ghcr.io/<owner>/ioc-enricher \
   --set image.tag=<sha-or-version> \
   --set 'imagePullSecrets[0].name=ghcr-pull' \
-  --set existingSecret=abuseipdb
+  --set existingSecret=ioc-enricher-keys
 kubectl -n ioc-enricher rollout status deploy/ioc-enricher
 ```
 

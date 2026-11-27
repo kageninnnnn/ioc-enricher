@@ -31,6 +31,37 @@ jobs:
       - run: ruff check --output-format=github .
       - run: ruff format --check .
 
+  helm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Helm lint
+        run: |
+          helm lint helm/ioc-enricher
+          helm lint helm/ioc-enricher --set serviceMonitor.enabled=true \
+            --set podDisruptionBudget.enabled=true --set autoscaling.enabled=true \
+            --set ingress.enabled=true --set existingSecret=ioc-enricher-keys \
+            --set config.redisUrl=redis://redis:6379/0
+      - name: Render manifests
+        run: |
+          mkdir -p rendered
+          helm template ioc-enricher helm/ioc-enricher -n ioc-enricher > rendered/default.yaml
+          helm template ioc-enricher helm/ioc-enricher -n ioc-enricher \
+            --set serviceMonitor.enabled=true --set podDisruptionBudget.enabled=true \
+            --set autoscaling.enabled=true --set ingress.enabled=true \
+            --set existingSecret=ioc-enricher-keys \
+            --set config.redisUrl=redis://redis:6379/0 > rendered/full.yaml
+      - name: Kubeconform (schema validation)
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work ghcr.io/yannh/kubeconform:v0.6.7 \
+            -strict -summary -kubernetes-version 1.31.0 \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            rendered/ k8s/policies/
+
   test:
     needs: lint
     runs-on: ubuntu-latest
@@ -195,9 +226,55 @@ jobs:
           trivyignores: .trivyignore
           exit-code: "1"
 
+  dast:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: image
+          path: ${{ runner.temp }}
+      - run: docker load -i "${{ runner.temp }}/image.tar"
+      - name: Start API container
+        run: |
+          docker run -d --name api -p 8000:8000 --read-only --tmpfs /tmp \
+            --cap-drop ALL --security-opt no-new-privileges \
+            -e RATE_LIMIT_PER_MINUTE=100000 "$LOCAL_IMAGE"
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8000/health && exit 0
+            sleep 2
+          done
+          docker logs api
+          exit 1
+      - name: OWASP ZAP API scan (OpenAPI)
+        run: |
+          mkdir -p zap && chmod 777 zap
+          docker run --rm --network host -v "$PWD/zap:/zap/wrk:rw" \
+            -v "$PWD/.zap/rules.tsv:/zap/wrk/rules.tsv:ro" \
+            ghcr.io/zaproxy/zaproxy:stable zap-api-scan.py \
+            -t http://127.0.0.1:8000/openapi.json -f openapi \
+            -c rules.tsv -r zap-report.html -J zap-report.json -I || true
+          # Gate: fail only on High-risk alerts (riskcode 3); Medium/Low are reported.
+          HIGH=$(jq '[.site[].alerts[] | select(.riskcode == "3")] | length' zap/zap-report.json)
+          echo "High-risk alerts: $HIGH"
+          jq -r '.site[].alerts[] | "[\(.riskdesc)] \(.name) (\(.pluginid))"' zap/zap-report.json
+          test "$HIGH" -eq 0
+      - name: API logs
+        if: always()
+        run: docker logs api || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: zap/
+          retention-days: 14
+
   # ---------------- publish (main only, all gates green) ----------------
   publish:
-    needs: [gitleaks, semgrep, trivy-fs, trivy-image]
+    needs: [helm, gitleaks, semgrep, trivy-fs, trivy-image, dast]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

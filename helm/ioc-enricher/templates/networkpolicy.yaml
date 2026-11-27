@@ -32,6 +32,14 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
+    {{- if .Values.config.redisUrl }}
+    # Redis cache inside the same namespace
+    - to:
+        - podSelector: {}
+      ports:
+        - port: 6379
+          protocol: TCP
+    {{- end }}
     {{- if .Values.networkPolicy.allowExternalEgress }}
     # HTTPS to public internet only (no cluster-internal / RFC1918)
     - to:
