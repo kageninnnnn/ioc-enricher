@@ -1,0 +1,67 @@
+# Runtime hardening baseline for the ioc-enricher namespace (Enforce).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: ioc-enricher-pod-security
+  annotations:
+    policies.kyverno.io/title: ioc-enricher pod security baseline
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      In namespace ioc-enricher, containers must not be privileged, must run as
+      non-root, must not allow privilege escalation and must use a read-only root filesystem.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: disallow-privileged
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [ioc-enricher]
+      validate:
+        message: "Privileged containers and privilege escalation are not allowed."
+        pattern:
+          spec:
+            =(initContainers):
+              - =(securityContext):
+                  =(privileged): "false"
+                  allowPrivilegeEscalation: "false"
+            containers:
+              - =(securityContext):
+                  =(privileged): "false"
+                securityContext:
+                  allowPrivilegeEscalation: "false"
+    - name: require-run-as-non-root
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [ioc-enricher]
+      validate:
+        message: "runAsNonRoot must be true (pod or container level)."
+        anyPattern:
+          - spec:
+              securityContext:
+                runAsNonRoot: "true"
+              containers:
+                - =(securityContext):
+                    =(runAsNonRoot): "true"
+          - spec:
+              containers:
+                - securityContext:
+                    runAsNonRoot: "true"
+    - name: require-readonly-rootfs
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [ioc-enricher]
+      validate:
+        message: "Containers must set securityContext.readOnlyRootFilesystem: true."
+        pattern:
+          spec:
+            containers:
+              - securityContext:
+                  readOnlyRootFilesystem: "true"

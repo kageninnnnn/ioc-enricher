@@ -1,0 +1,53 @@
+# Admission gate: only images signed by THIS repo's CI on main (keyless cosign / Sigstore)
+# and carrying a signed SPDX SBOM attestation may run.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-ioc-enricher-image
+  annotations:
+    policies.kyverno.io/title: Verify ioc-enricher image signature and SBOM
+    policies.kyverno.io/category: Software Supply Chain Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Rejects Pods running ghcr.io/kageninnnnn/ioc-enricher images that were not signed
+      keylessly by the ci.yml workflow on refs/heads/main, or that lack a signed
+      SPDX SBOM attestation produced by the same workflow.
+spec:
+  validationFailureAction: Enforce
+  background: false
+  webhookTimeoutSeconds: 30
+  failurePolicy: Fail
+  rules:
+    - name: verify-signature-and-sbom
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      verifyImages:
+        - imageReferences:
+            - "ghcr.io/kageninnnnn/ioc-enricher*"
+          mutateDigest: true      # pin the tag to the verified digest
+          verifyDigest: true
+          required: true
+          attestors:
+            - entries:
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    subjectRegExp: "^https://github\\.com/kageninnnnn/ioc-enricher/\\.github/workflows/ci\\.yml@refs/heads/main$"
+                    rekor:
+                      url: https://rekor.sigstore.dev
+          attestations:
+            - type: https://spdx.dev/Document
+              attestors:
+                - entries:
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subjectRegExp: "^https://github\\.com/kageninnnnn/ioc-enricher/\\.github/workflows/ci\\.yml@refs/heads/main$"
+                        rekor:
+                          url: https://rekor.sigstore.dev
+              conditions:
+                - all:
+                    # the SBOM must actually describe packages
+                    - key: "{{ length(packages || `[]`) }}"
+                      operator: GreaterThan
+                      value: 0

@@ -38,14 +38,24 @@ spec:
             - name: http
               containerPort: {{ .Values.containerPort }}
               protocol: TCP
+          {{- if .Values.existingSecret }}
+          envFrom:
+            # Every key in the Secret becomes an env var (ABUSEIPDB_API_KEY,
+            # VIRUSTOTAL_API_KEY, OTX_API_KEY, ABUSECH_AUTH_KEY, API_KEYS).
+            - secretRef:
+                name: {{ .Values.existingSecret }}
+                optional: true
+          {{- end }}
           env:
-            {{- if .Values.existingSecret }}
-            - name: ABUSEIPDB_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.existingSecret }}
-                  key: {{ .Values.existingSecretKey }}
-                  optional: true
+            - name: CACHE_TTL_SECONDS
+              value: {{ .Values.config.cacheTtlSeconds | quote }}
+            - name: RATE_LIMIT_PER_MINUTE
+              value: {{ .Values.config.rateLimitPerMinute | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            {{- if .Values.config.redisUrl }}
+            - name: REDIS_URL
+              value: {{ .Values.config.redisUrl | quote }}
             {{- end }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}

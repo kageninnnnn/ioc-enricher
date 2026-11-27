@@ -9,7 +9,11 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 WORKDIR /build
 COPY requirements.txt .
-RUN pip install --upgrade pip setuptools wheel && pip install -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt \
+ # No build tooling or package manager in the shipped venv. pip itself must go
+ # too: it vendors setuptools 70.3.0 (pip/_vendor), flagged as CVE-2025-47273.
+ && (pip uninstall -y setuptools wheel 2>/dev/null || true) \
+ && python -m pip uninstall -y pip
 
 # ---------- runtime: minimal, non-root, no compilers ----------
 FROM python:3.12-slim-bookworm AS runtime
@@ -22,6 +26,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH"
 RUN apt-get update && apt-get upgrade -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/* \
+ # The app runs from /opt/venv: drop the base image's system pip (it vendors a
+ # vulnerable setuptools) and any setuptools leftovers from the runtime image.
+ && (python -m pip uninstall -y setuptools wheel pip 2>/dev/null || true) \
+ && rm -rf /usr/local/lib/python3.12/site-packages/setuptools* \
+           /usr/local/lib/python3.12/site-packages/pkg_resources \
+           /usr/local/lib/python3.12/site-packages/_distutils_hack \
+           /usr/local/lib/python3.12/site-packages/distutils-precedence.pth \
+           /usr/local/lib/python3.12/ensurepip/_bundled/setuptools-*.whl \
  && groupadd --system --gid 10001 app \
  && useradd --system --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app
 COPY --from=builder /opt/venv /opt/venv

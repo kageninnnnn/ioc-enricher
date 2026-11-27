@@ -1,7 +1,7 @@
 import pytest
 
 from app.models import IndicatorType as T
-from app.services.detector import detect_type, normalize
+from app.services.detector import detect_type, normalize, refang
 
 
 @pytest.mark.parametrize(
@@ -32,4 +32,20 @@ def test_normalize():
     assert normalize("ABCDEF" + "0" * 26, T.MD5) == "abcdef" + "0" * 26
     assert normalize("Example.COM.", T.DOMAIN) == "example.com"
     assert normalize("2001:DB8:0::BAD", T.IPV6) == "2001:db8::bad"
-    assert normalize("http://X", T.URL) == "http://X"
+    assert normalize("HTTP://Evil.Example/Path", T.URL) == "http://evil.example/Path"
+
+
+@pytest.mark.parametrize(
+    ("defanged", "expected", "type_"),
+    [
+        ("hxxp://evil[.]example/login", "http://evil.example/login", T.URL),
+        ("hXXps://evil(.)example", "https://evil.example", T.URL),
+        ("185.220.101[.]1", "185.220.101.1", T.IPV4),
+        ("evil[dot]example", "evil.example", T.DOMAIN),
+        ("evil{.}example", "evil.example", T.DOMAIN),
+    ],
+)
+def test_refang(defanged, expected, type_):
+    assert refang(defanged) == expected
+    assert detect_type(defanged) is type_
+    assert normalize(defanged, type_) == expected

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IOC Enricher</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>IOC Enricher</h1>
+  <p class="sub">Paste IPs, domains, URLs or hashes, one per line. Defanged input (<code>hxxp://evil[.]com</code>) works.</p>
+</header>
+<main>
+  <form id="form">
+    <textarea id="iocs" rows="6" spellcheck="false" placeholder="185.220.101.1&#10;hxxp://evil-phish[.]example/login&#10;44d88612fea8a8f36de82e1278abb02f"></textarea>
+    <div class="row">
+      <input id="apikey" type="password" autocomplete="off" placeholder="X-API-Key (if auth enabled)">
+      <button type="submit" id="go">Enrich</button>
+    </div>
+  </form>
+  <div id="summary" class="summary" hidden></div>
+  <div id="status" role="status"></div>
+  <div id="results"></div>
+</main>
+<footer><a href="/docs">API docs</a> · <a href="/metrics">metrics</a></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

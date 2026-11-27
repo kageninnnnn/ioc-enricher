@@ -17,9 +17,20 @@ serviceAccount:
   name: ""
   annotations: {}
 
-# Name of an existing Secret (e.g. created by a SealedSecret) holding ABUSEIPDB_API_KEY
+# Name of an existing Secret (e.g. created by a SealedSecret). All of its keys are
+# injected with envFrom (optional), so any subset of these may be present:
+#   ABUSEIPDB_API_KEY, VIRUSTOTAL_API_KEY, OTX_API_KEY, ABUSECH_AUTH_KEY, API_KEYS
+# Backward compat: a v0.1 Secret holding only ABUSEIPDB_API_KEY keeps working as-is.
+# (`existingSecretKey` from v0.1 is no longer used - name the key ABUSEIPDB_API_KEY.)
 existingSecret: ""
-existingSecretKey: ABUSEIPDB_API_KEY
+
+# Non-secret runtime configuration, rendered as env vars
+config:
+  cacheTtlSeconds: 3600
+  rateLimitPerMinute: 60
+  logLevel: info
+  # e.g. redis://redis-master.ioc-enricher.svc:6379/0 ; empty = in-memory cache per pod
+  redisUrl: ""
 
 env: []
 #  - name: LOG_LEVEL
@@ -85,7 +96,7 @@ livenessProbe:
 
 readinessProbe:
   httpGet:
-    path: /health
+    path: /ready
     port: http
   initialDelaySeconds: 3
   periodSeconds: 10
@@ -105,6 +116,17 @@ networkPolicy:
     - kube-system
   # Allow egress HTTPS to the internet for enrichment APIs (AbuseIPDB etc.)
   allowExternalEgress: true
+
+# Prometheus Operator ServiceMonitor (requires the monitoring.coreos.com CRDs)
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
 
 nodeSelector: {}
 tolerations: []

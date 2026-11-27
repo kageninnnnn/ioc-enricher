@@ -3,18 +3,24 @@
 ```mermaid
 flowchart LR
   A[push / PR to main] --> L[lint: ruff]
+  A --> H[helm: lint + template<br/>+ kubeconform]
   L --> T[test: pytest --cov >= 80%]
   T --> B[build: docker buildx -> image.tar artifact]
   B --> G1[gitleaks<br/>full git history]
   B --> G2[semgrep<br/>p/python + p/owasp-top-ten]
   B --> G3[trivy fs<br/>SCA deps]
   B --> G4[trivy image<br/>OS + libs]
-  G1 & G2 & G3 & G4 --> P{push to main?}
+  B --> G5[DAST: OWASP ZAP<br/>API scan via openapi.json]
+  H & G1 & G2 & G3 & G4 & G5 --> P{push to main?}
   P -- yes --> R[push ghcr.io/&lt;repo&gt;:&lt;sha&gt; + latest]
   R --> S[cosign keyless sign + syft SBOM attestation]
-  S --> CD[cd.yml workflow_run: verify signature -> helm upgrade<br/>self-hosted runner, env: production]
+  S --> CD[cd.yml workflow_run: cosign verify -> helm upgrade<br/>self-hosted runner, env: production]
+  CD --> K{Kyverno admission}
+  K -- signed by ci.yml@main<br/>+ SBOM attestation --> RUN[Pod running<br/>digest-pinned]
+  K -- unsigned / foreign --> DENY[rejected]
   P -- PR --> X[stop: no publish]
   G1 & G2 & G3 & G4 -. SARIF .-> CS[(GitHub code scanning)]
+  G5 -. HTML/JSON report .-> ART[(artifact: zap-report)]
 ```
 
 | Tool | Stage | What it catches | Fails build when |
@@ -23,6 +29,8 @@ flowchart LR
 | pytest + pytest-cov | test | regressions, untested code | test fails or coverage < 80% |
 | gitleaks | gate | hardcoded secrets (AWS keys, tokens, private keys) in **any** commit | any finding |
 | semgrep | gate (SAST) | injection, insecure deserialization, weak crypto, SSRF, OWASP Top 10 patterns | finding with severity ERROR |
+| OWASP ZAP (`zap-api-scan.py`) | gate (DAST) | runtime issues on the running container: missing security headers, error disclosure, injection probes against every OpenAPI operation | any **High** risk alert (overrides in `.zap/rules.tsv`) |
+| helm lint + kubeconform | gate (IaC) | broken chart templates, invalid Kubernetes / CRD schemas (incl. Kyverno policies) | lint error or schema violation |
 | trivy fs | gate (SCA) | known CVEs in `requirements*.txt` dependencies | fixable CRITICAL/HIGH CVE |
 | trivy image | gate | CVEs in base image OS packages + installed Python libs | fixable CRITICAL/HIGH CVE |
 | cosign | supply chain | image tampering; CD verifies signature before deploy | CD refuses unsigned image |
