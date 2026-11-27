@@ -299,10 +299,15 @@ jobs:
           IMAGE="$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')"
           docker tag "$LOCAL_IMAGE" "$IMAGE:$GITHUB_SHA"
           docker tag "$LOCAL_IMAGE" "$IMAGE:latest"
-          docker push "$IMAGE:$GITHUB_SHA"
+          docker push "$IMAGE:$GITHUB_SHA" | tee "$RUNNER_TEMP/push.log"
           docker push "$IMAGE:latest"
-          DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE:$GITHUB_SHA")"
-          echo "ref=$DIGEST" >> "$GITHUB_OUTPUT"
+          # Take the registry digest from the push output. After `docker load`,
+          # .RepoDigests[0] can be the bare local name (ioc-enricher@sha256:...),
+          # which made cosign look the image up on Docker Hub.
+          DIGEST="$(grep -oE 'digest: sha256:[0-9a-f]{64}' "$RUNNER_TEMP/push.log" | head -1 | cut -d' ' -f2)"
+          test -n "$DIGEST" || { echo "could not read pushed digest"; exit 1; }
+          echo "ref=$IMAGE@$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "Pushed $IMAGE@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
       - uses: sigstore/cosign-installer@v3
       - uses: anchore/sbom-action/download-syft@v0
       - name: Cosign keyless sign (by digest)
