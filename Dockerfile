@@ -10,8 +10,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 WORKDIR /build
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt \
- # build tooling is not needed at runtime: keep it out of the shipped venv
- && (pip uninstall -y setuptools wheel 2>/dev/null || true)
+ # No build tooling or package manager in the shipped venv. pip itself must go
+ # too: it vendors setuptools 70.3.0 (pip/_vendor), flagged as CVE-2025-47273.
+ && (pip uninstall -y setuptools wheel 2>/dev/null || true) \
+ && python -m pip uninstall -y pip
 
 # ---------- runtime: minimal, non-root, no compilers ----------
 FROM python:3.12-slim-bookworm AS runtime
@@ -24,8 +26,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH"
 RUN apt-get update && apt-get upgrade -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/* \
- # The base image's system Python ships pip/setuptools (CVE-2025-47273 et al.);
- # the app runs from /opt/venv, so drop them from the runtime image entirely.
+ # The app runs from /opt/venv: drop the base image's system pip (it vendors a
+ # vulnerable setuptools) and any setuptools leftovers from the runtime image.
  && (python -m pip uninstall -y setuptools wheel pip 2>/dev/null || true) \
  && rm -rf /usr/local/lib/python3.12/site-packages/setuptools* \
            /usr/local/lib/python3.12/site-packages/pkg_resources \
